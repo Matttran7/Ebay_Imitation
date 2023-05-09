@@ -1,0 +1,199 @@
+from heapq import merge
+import json
+import csv
+import datetime
+import pandas as pd
+import numpy as np
+# CSVs
+item_csv = open('ItemData.csv','w+', newline='')
+seller_csv = open('SellerData.csv','w+', newline='')
+bidder_csv = open('BidderData.csv','w+', newline='')
+category_csv = open('CategoryData.csv','w+', newline='')
+item_writer = csv.writer(item_csv)
+seller_writer = csv.writer(seller_csv)
+bidder_writer = csv.writer(bidder_csv)
+category_writer = csv.writer(category_csv)
+
+# make headers 
+ItemHeaders = ["ItemID", "Name", "Currently", "First_Bid",
+             "Number_of_Bids", "Location", "Country", "Started", 
+             "Ends", "Seller", "Description"]
+item_writer.writerow(ItemHeaders)
+BidderHeaders = ["BidderID","BidderRating","BidderLocation","BidderCountry",
+                 "BidTime","Bid_Amount","ItemID"]
+bidder_writer.writerow(BidderHeaders)
+SellerHeaders = ["Seller","SellerRating","ItemID"]
+seller_writer.writerow(SellerHeaders)
+CategoryHeaders = ["ItemID","Category"]
+category_writer.writerow(CategoryHeaders)
+
+# file
+for x in range (0,40):
+    filename = "items-"+str(x)+".json"
+
+    fp =open(filename)
+    data = json.load(fp)
+
+    #write data
+    #for each in data["Item"]:
+    #    print(each)
+    #    break
+    format = '%b-%d-%y %H:%M:%S'
+    ItemIDHolder = []
+    SellerIDHolder = []
+    BidderIDHolder = []
+    CategoryHolder = []
+    for items in data["Items"]:
+        CategoryHolder.clear()
+        if(items["ItemID"] in ItemIDHolder):
+            continue
+        ItemIDHolder.append(items["ItemID"])
+
+        StartDate = datetime.datetime.strptime(items["Started"],format)
+        EndDate = datetime.datetime.strptime(items["Ends"],format)
+        FirstBid = items["First_Bid"].strip("$")
+        FirstBid = float(FirstBid.replace(",",""))
+        Currently = items["Currently"].strip("$")
+        Currently = float(Currently.replace(",",""))
+
+        #category
+        for index,x in enumerate(items["Category"]):
+            if not items["Category"][index] in CategoryHolder:
+                CategoryHolder.append(items["Category"][index])
+
+        #Bidder info
+        BidTime = None
+        BidAmount = 0
+        BidderID = None
+        BidderRating = None
+        BidderLocation = ""
+        BidderCountry = ""
+        if not items["Bids"] == None:
+            bids = items["Bids"]
+            for bid in bids:
+                eachBid = bid["Bid"]
+                Bidder = eachBid["Bidder"]
+                BidderID = Bidder["UserID"] 
+                BidderRating = Bidder["Rating"]
+                if(BidderRating == None):
+                    BidderRating = 0
+                elif(int(BidderRating) < 0):
+                    BidderRating = 0
+                try:
+                    BidderLocation = Bidder["Location"]
+                except:
+                    BidderLocation = None
+                try:
+                    BidderCountry = Bidder["Country"]
+                except:
+                    BidderCountry = None
+                BidTime =  datetime.datetime.strptime(eachBid["Time"],format)
+                BidAmount = eachBid["Amount"].strip("$")
+                BidAmount = float(BidAmount.replace(",",""))
+                if(BidAmount < 0):
+                    BidAmount = 0
+
+        # Seller
+        sellerID = ""
+        seller = items["Seller"]
+        sellerID = seller["UserID"]
+        sellerRating = seller["Rating"]  
+
+        # Remove '\' from str  
+        Description = items["Description"]
+        Description = str("" if Description is None else Description).replace('\\','')
+        name = items["Name"]
+        name = str("" if name is None else name).replace('\\','')
+        location = items["Location"]
+        location = str("" if location is None else location).replace('\\','')
+        ItemRow = {
+            "ItemID": items["ItemID"],
+            "Name": name,
+            "Category": items["Category"],
+            "Currently": Currently, 
+            "First_Bid": FirstBid,
+            "Number_of_Bids": items["Number_of_Bids"], 
+            "Location": location, 
+            "Country": items["Country"],
+            "Started": StartDate, 
+            "Ends": EndDate, 
+            "Seller": sellerID, 
+            "Description": Description
+            }
+        #check for nulls
+        for i in ItemRow:
+            if(ItemRow[i] == "" or ItemRow[i] == " " or ItemRow[i] == "[]" or ItemRow[i] == "()" or ItemRow[i] == None):
+                if(i == "Bids"):
+                    ItemRow[i] == 0
+                elif(i == "Started" or i == "Ends"):
+                    ItemRow[i] = "Jan-00-00 00:00:00"
+                else:
+                    ItemRow[i] == None
+        BidderRow = {
+            "BidderID": BidderID,
+            "BidderRating": BidderRating,
+            "BidderLocation": BidderLocation,
+            "BidderCountry": BidderCountry,
+            "BidTime": BidTime,
+            "Bid_Amount": BidAmount,
+            "ItemID": items["ItemID"]
+        }
+        #check for nulls
+        for i in BidderRow:
+            if(BidderRow[i] == "" or BidderRow[i] == " " or BidderRow[i] == "[]" or BidderRow[i] == "()" or BidderRow[i] == None):
+                if(i == "BidderRating"):
+                    BidderRow[i] = 0
+                else:
+                    BidderRow[i] = ''
+                
+        SellerRow = {
+            "Seller": sellerID,
+            "SellerRating": sellerRating,
+            "ItemID": items["ItemID"]
+        }
+        #check for nulls
+        for i in SellerRow:
+            if(i=="SellerRating"):
+                if(int(SellerRow[i]) < 0):
+                    SellerRow[i] = 0
+            elif(SellerRow[i] == "" or SellerRow[i] == " " or SellerRow[i] == "[]" or SellerRow[i] == "()" or SellerRow[i] == None):
+                SellerRow[i] = ''
+        for each in CategoryHolder:
+            CategoryRow = {
+                "ItemID" : items["ItemID"],
+                "Category": each
+            }
+            category_writer.writerow(CategoryRow.get(header, None) for header in CategoryHeaders)
+        item_writer.writerow(ItemRow.get(header, None) for header in ItemHeaders)
+        seller_writer.writerow(SellerRow.get(header, None) for header in SellerHeaders)
+        bidder_writer.writerow(BidderRow.get(header, None) for header in BidderHeaders)
+
+# clean and close
+item_csv.close()
+seller_csv.close()
+bidder_csv.close()
+
+df2= pd.read_csv("BidderData.csv")
+
+df2['ItemID'] = pd.to_numeric(df2['ItemID'],errors='coerce')
+# Drop all rows with no bidderID
+df2['BidderID'].replace('', np.nan, inplace=True)
+df2.dropna(subset=['BidderID'], inplace=True)
+
+df_itemid = df2['ItemID'].values.tolist()
+
+# clear zero data
+itemIDList = []
+for ind in range(len(df_itemid)):
+    if df_itemid[ind] not in itemIDList:
+        itemIDList.append(df_itemid[ind])
+print("Length of unique itemId in bidder: ")
+print(len(itemIDList))
+# write back to csv
+#df2.drop(df2[df2['BidderRating'] >= 0].index, inplace = True)
+df2.to_csv('BidderData.csv', index=False)
+
+df3= pd.read_csv("SellerData.csv")
+df3.drop_duplicates(subset=['Seller'], inplace=True)
+#df3.drop(df3[df3['SellerRating'] >= 0].index, inplace = True)
+df3.to_csv('SellerData.csv', index=False)

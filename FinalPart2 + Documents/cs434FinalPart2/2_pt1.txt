@@ -1,0 +1,16 @@
+/*Q1*/
+select sum(number_of_bids) from tblitems;
+select sum(currently) from tblitems;
+select sum(first_bid) from tblitems;
+
+/*Q2*/
+select count(itemid) from (select itemid from tblbids GROUP BY itemid);
+
+/*Q3*/
+select started from tblitems where (started BETWEEN '2001-12-01' and '2001-12-03');
+/*Auctioned off Dec 1 2000*/
+select ends from tblitems where (ends BETWEEN '2000-12-01' and '2001-01-01');
+
+/*Q4*/
+select count(itemID) from tblitems where currently < 95.76;
+
